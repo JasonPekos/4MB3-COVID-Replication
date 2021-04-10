@@ -11,6 +11,7 @@ library("deSolve")
 library("tibble")
 theN <- 10*10^6
 make_params <- function(Beta = 0.4215,
+                        betavals = c(0.4215,0.4215,0.4215,0.4215,0.4215)
                         N = theN,
                         gamma = 0.0876,
                         delta = 0.0028,
@@ -291,7 +292,7 @@ colnames(sim2) <- c("time", paste0(colnames(sim2)[2:length(colnames(sim2))], ": 
 }
 
 para = make_params()
-para["Beta"] <- 0
+para["gamma"] <- 0
 print(para == make_params())
 run_sim(params = para)
 ```
