@@ -1,6 +1,6 @@
 ---
 title: "Expansion"
-author: "Zachary Levine"
+author: "Zachary Levine, Jason Pekos,  Ariel Pillitteri"
 date: "08/04/2021"
 output: pdf_document
 ---
@@ -9,31 +9,43 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-"Mathematical Models for Assessing Vaccination Scenarios in Several Provinces in Indonesia N. Nuraini, K. Khairudin, P. Hadisoemarto, H. Susanto, A. Hasan, and N. Sumarti"
+"Mathematical Models for Assessing Vaccination Scenarios in Several Provinces in Indonesia N. Nuraini, K. Khairudin, P. Hadisoemarto, H. Susanto, A. Hasan, and N. Sumarti" \
 
-Expanding old gradient functions from replication assignment to incorporate awarness.
 
-```{r echo = FALSE}
+A version of this submission with code hidden for easier reading was submitted alongside this. 
+\
+
+First, Zach modified our initial model to incorporate a robust awareness function, in which people become more aware --- and therefore have lower transmissibility --- when people from their same age cohort are catching COVID at high rates. This adds dampened oscillation to the model; high spikes in fatality and new infections are followed by large decreases in case growth. \
+
+This was incorporated when we noticed that the initial model was a poor fit for real world data: the python optimizer from last time was fully implemented, leading to poor fits to data.\
+
+
+It turns out our fitted infection curves totally failed to capture the underlying dynamics in the simpler model. This is largely because --- following the initial spike in deaths during the spring --- transmisibility stayed low due to public panic, only for it to creep up again in the fall. This is not captured well in a standard SIR model, and so this extension is about quantifying this problem and dealing with it. \
+
+
+Expanding the old gradient functions from the first replication assignment to incorporate awareness, we get the following full model output:
+\
+
+```{r}
 library("deSolve")
 library("tibble")
-
 theN <- 3565000
-make_params <- function(Beta = 0.421,
+make_params <- function(Beta = 0.4215,
                         N = theN,
                         gamma = 0.0876,
                         delta = 0.0028,
                         ##Awarness constant.
-                        delta_c = 50/N,
+                        delta_c = 1/N,
                         ##For each age class
-                        deltas = c(1, 4, 3, 2, 1),
+                        deltas = c(0.15, 0.16, 0.627, 1.2, 3.1),
                         v = NULL,
                         q = 0.2,
                         nu = 0.85,
                         ##Sharpness constant
                         k = 3,
-                        reinf = 0.5,
-                        mu = 0.000001,
-                        natural_death = 0.0001 
+                        reinf = 0.05,
+                        mu = 0,
+                        natural_death = 0
                         ){
   return(c("Beta" = Beta,
               "gamma" = gamma,
@@ -50,7 +62,7 @@ make_params <- function(Beta = 0.421,
              "natural_death" = natural_death))
 }
 make_inits <- function(S = theN - I,
-                    I = 1,
+                    I = 100,
                     Q = 0,
                     R = 0,
                     D = 0,
@@ -72,25 +84,24 @@ make_beta <- function(betavals = c(0.0251, 0.0355, 0.122, 0.1698, 0.4488)){
   }
   return(Beta)
 }
-
-make_age_inits <- function(I0= c(1, 1, 1, 1, 1), N = theN){
-  #######I MADE ONE CHANGE HERE -JASON
-  #######Initial susceptables in age group highly variable as it 
-  #######DEPENDS HEAVILY ON POPULATION STUCTURE. Dug up CN census data
-  #######AND GOT THE PROPORTION OF POP IN EACH AGE GROUP. ADDED HERE
+make_age_inits <- function(I0= c(5, 45, 35, 25, 35), N = theN){
   ##Cite Dr. Bolker's Feedback on Milestone 1 
   n_age <- length(I0)
-  struct = c(0.105587012,0.257629189,0.245480097,0.269248731,0.122054971)
- state <- unlist(c(S=(N-I0)*struct, I=I0, Q=rep(0,n_age), R=rep(0, n_age),
+ state <- unlist(c(S=(N-I0)/n_age, I=I0, Q=rep(0,n_age), R=rep(0, n_age),
 D=rep(0,n_age)))
  return(state)
  
 }
-
 paramNames <- c("Beta", "gamma", "delta", "N", "q", "nu", "reinf", "mu", "natural_death")
 stateNames <- c("S",  "I", "Q", "R", "D")
 run_sim <- function(params = make_params(),
-                    use_awareness = TRUE,
+                    use_awareness = FALSE,
+                    Beta1 = 0.451,
+                    Beta2 = 0.655,
+                    Beta3 = 0.5122,
+                    Beta4 = 0.71698,
+                    Beta5 = 0.7488,
+                    betavals = c(Beta1, Beta2, Beta3, Beta4, Beta5),
                     ##A function of time for the vaccination strategy.
                     vaccine_strategy = NULL,
                     use_age_structure = TRUE,
@@ -118,7 +129,7 @@ run_sim <- function(params = make_params(),
       with(as.list(c(parameters)), {
         v <- v_func(time)
         v_hat <- nu * v
-      theBeta <-  make_beta()
+      theBeta <-  make_beta(betavals = betavals)
       beta_I_sums <- numeric(5)
       for (i in 1:5){
         beta_I_sums[i] <- sum(theBeta[i,]%*%as.matrix(I/N))
@@ -143,7 +154,7 @@ run_sim <- function(params = make_params(),
       with(as.list(c(parameters)), {
         v <- v_func(time)
         v_hat <- nu * v
-      theBeta <-  make_beta()
+      theBeta <-  make_beta(betavals = betavals)
       beta_I_sums <- numeric(5)
       ##Do this first
       dD <- delta * Q
@@ -161,7 +172,6 @@ run_sim <- function(params = make_params(),
       })
     }
     }
-
   }
   else{
     if (!use_awareness){
@@ -202,7 +212,6 @@ if (use_age_structure){
    
   
 }
-
 else{
   res <- as.data.frame(ode(y = init,
                        times = time,
@@ -212,15 +221,25 @@ else{
 }
 return(res)
 }
+
+############PLOTTING STARTS HERE
 plot_sim <- function(use_age_structure =TRUE,
                      length = 150,
                      use_awareness = FALSE,
                      vaccine_strategy = NULL,
+                    Beta1 = 0.0251,
+                    Beta2 = 0.0355,
+                    Beta3 = 0.122,
+                    Beta4 = 0.1698,
+                    Beta5 = 0.4488,
+                    betavals = c(Beta1, Beta2, Beta3, Beta4, Beta5),
+                     params = make_params(),
                      sim = run_sim(use_age_structure = use_age_structure,
                                    length = length,
+                                   betavals = betavals,
+                                   params = params,
                                    use_awareness = use_awareness,
                                    vaccine_strategy = vaccine_strategy),
-
                      drop = c("S", "R")){
   library("dplyr")
   library("ggpubr")
@@ -257,7 +276,6 @@ plot_sim <- function(use_age_structure =TRUE,
                             labels = month.name[month(lubridate::today() + days(seq(from = 0, to = length, by = 20)))])
     p
 }
-
 compare_vaccine_plot <- function(strat = NULL,
                                  length = 150,
                                  use_age_structure = FALSE,
@@ -306,17 +324,31 @@ colnames(sim2) <- c("time", paste0(colnames(sim2)[2:length(colnames(sim2))], ": 
                                          to = length, by = 20),
                             labels = month.name[month(lubridate::today() + days(seq(from = 0, to = length, by = 20)))])
     p
+    
 }
 
-
-para = make_params()
-
-para["Beta"] = 2
-run_sim(para)
 ```
 
 
-This next few code chunks provide a nice framework for plotting the CN covid data by town, with plenty of options. meant for checking spacial heterogeniety condition. 
+```{r, warning=FALSE, results='hide',message=FALSE}
+plot_sim(use_awareness = TRUE )
+q = run_sim(use_awareness = TRUE)
+```
+
+
+
+Isolating one term, note the dampened oscillation; this was not present in the initial model, and it better matches the periodic behaviour of COVID:\
+```{r}
+plot(q$I5, pch = 10, type = "o")
+title( "Infected Elderly (Age Group Five)")
+```
+
+
+
+The next few code chunks provide a nice framework for plotting the CN covid data by town, with plenty of options. This is meant for checking spacial heterogeniety --- as mentioned in meetings, we looked a lot at how we could get better and more accurate model fit, using results from the King et al paper. This paper notes that in pandemics with high spacial heterogeniety, models fail to predict pandemic outcomes due to many small local flairups vitiating the usual logic around herd immunity in an SIR model, which requires a high level of mixing to be accurate. (Note, some of these code chunks moved to the start to fascilitate the flow of this overview, specifically the python plotting).\
+
+
+
 ```{python}
 #This chunk handles python imports
 import pandas as pd
@@ -331,15 +363,14 @@ AgeDeathDat = pd.read_csv("ageDeaths.csv")
 This is the main code for plotting. 
 ```{python}
 #read in the covid data organized by town.
-
-#These are graph settings for Seaborn. Can ignore if trying to understand code --- they mask matplotlib features I'm pretty sure.
+#These are graph settings for Seaborn. Can ignore if trying to 
+#understand code --- they mask
+#matplotlib features I'm pretty sure.
 rc={'lines.linewidth': 4, 'axes.labelsize': 20, 'axes.titlesize': 18}
 sns.set(rc=rc)
 sns.set_style("whitegrid", {'axes.grid' : False}) #remove grey grid
 sns.set_context("paper") #changes the theme
 plt.rcParams['figure.figsize'] = [16, 7] #changes the size
-
-
 #Function for separating out towns.
 def getTown(df: pd.DataFrame, n: int) -> pd.DataFrame:
     '''
@@ -376,10 +407,6 @@ def cleandatAge(df: pd.DataFrame,
     return(j)
     
     
-    
-    
-
-
 def getPeak(df:pd.DataFrame, n:int, metric:str) -> pd.DataFrame:
     '''
     given original dataframe df, town number n, and metric str, 
@@ -411,9 +438,6 @@ def getFullPeakDF(df:pd.DataFrame, metric:str) -> pd.DataFrame:
     MaxDF.reset_index(drop=True, inplace=True)
     
     return(MaxDF)    
-
-
-
 def plotTownCases(df: pd.DataFrame,
                   n:int,
                   metric: str,
@@ -491,19 +515,16 @@ def getAgeGroupDF(df:pd.DataFrame, group: str, bins:int = 14) -> pd.DataFrame:
     dict0 = {"Date": j["Date"][1:], "Deaths": np.nan_to_num(np.diff(j["Total deaths"]))}
     _ =  pd.DataFrame(dict0)
     dict1 = {"Date": _["Date"][bins:], "Deaths": _["Deaths"].rolling(14).mean()[bins:]}
-
     
     return(pd.DataFrame(dict1))
-
-
-
-    
-
 ```
 
-Next, produce a plot to check the above chunks:
+\
+Next, we produce plots to check spacial heterogeniety for some of the larger towns:\
 ```{python}
 #Plots
+plt.figure(figsize=(10,5))
+
 plotTownCases(ByTown, 13, "Confirmed cases", 'g', maxcaseline = True)
 plotTownCases(ByTown, 151, "Confirmed cases",'b', maxcaseline = True)
 plotTownCases(ByTown, 135, "Confirmed cases", 'y', maxcaseline = True)
@@ -512,6 +533,11 @@ plotTownCases(ByTown, 12, "Confirmed cases", 'r', maxcaseline = True)
 plotTownCases(ByTown, 83, "Confirmed cases", 'c', maxcaseline = True)
 plt.show()
 ```
+
+Every large town has a pretty similar outbreak pattern --- this is a great sign for our model, which assumes dynamics like this. We didn't end up using this space-structured data in fitting, but it's good to see that this model assumption is validated. \
+
+\
+Our model is age-structured, so we need to import the CN data broken down by age group. We do this and plot below:\
 
 
 ```{python}
@@ -558,14 +584,20 @@ plt.plot(df8["Date"],df8["Cases"], label = "over 80")
 plt.plot()
 plt.legend()
 
-agedf.columns
-
+#agedf.columns
 ```
+
+\
+Note how the data is wildly noisy --- this can make it hard to get good model fit. Artificially low new case totals in a day pull can impact model fit by pulling the curve down below the true value. See the first graph in the milestone for a look at this in action.\
+
+Because of this, we implemented two methods for data smoothing as a form of preprocessing.\
+
+First, LOESS, as recommended on Zulip.\
 
 ```{r}
 library(reticulate)
 #LOESS SMOOTHING
-#Actually really really bad. What a shame.
+#Actually really not great. Will compare to rolling average:
 #based on code by Ben Bolker on Zulip
 dd = py$df0
 x = dd$Date
@@ -577,22 +609,23 @@ lines(dd$Date,predict(m))
 title("loess smoothing of cases, age 0-9")
 ```
 
-Compared to rolling avg with two-week bin:
+\
+Compared to rolling avg with two-week bin:\
 
 ```{python}
-plt.figure(figsize=(20,10))
+#Seaborn titles are very weird in reticulate Rmd. Maybe plot seperatley and 
+#include as images for final report.
+plt.figure(figsize=(10,5))
 plt.plot(df0["Date"], df0["Cases"].rolling(14).mean())
 plt.plot(df0["Date"], df0["Cases"], marker = "o", linestyle="None")
 plt.title("14-day rolling average of cases, age 0-9")
 plt.show()
 ```
 
-```{python}
-q = getAgeGroupDF(AgeDeathDat, group = "80 and older", bins = 1)
+\
+It seems like the rolling average might capture more of the model structure compared to the LOESS method. Moving forwards here, we'll use moving averages, though this is subject to change for the final project. \
 
-plt.plot(q["Date"],q["Deaths"])
-
-```
+Plotting all the rolling averages for every age group:\
 
 ```{python}
 ###Make  dataframe for 14-day rolling average dataset of cases
@@ -603,7 +636,6 @@ plt.plot(q["Date"],q["Deaths"])
 # 50-59 and 60-69 cluster
 # 70-79 and 80+ cluster
 bins = 14
-
 
 dict = {"Date": df0["Date"][bins:], "Cases":  df0["Cases"].rolling(14).mean()[bins:]}
 df0_9 = pd.DataFrame(dict)
@@ -620,6 +652,7 @@ df50_69  = pd.DataFrame(dict)
 dict = {"Date": df1["Date"][bins:], "Cases":  (df7["Cases"] + df8["Cases"]).rolling(14).mean()[bins:]}
 df70_89  = pd.DataFrame(dict)
 
+plt.figure(figsize=(10,5))
 plt.plot(df0_9["Date"], df0_9["Cases"], label = "Under 10")
 plt.plot(df10_29["Date"], df10_29["Cases"], label = "10-29")
 plt.plot(df30_49["Date"], df30_49["Cases"], label = "30-49")
@@ -628,12 +661,21 @@ plt.plot(df70_89["Date"], df50_69["Cases"], label = "70+")
 plt.legend()
 plt.title("Case Count by Age Group (rolling average)")
 plt.show()
-
 ```
 
+\
+Fitting to new cases introduced a lot of issues, given that our model has no direct analogue. Multiple composite measures such as  $Infected + Quarantined + Dead$ were tried, but in the end it seemed easier to fit to deaths. This is available from a different dataset online, which is pulled processed,and plotted below.:\
+```{python}
+#Test code to get data from the age-structured deaths dataset. (auto deagregated)
+q = getAgeGroupDF(AgeDeathDat, group = "80 and older", bins = 1)
+plt.figure(figsize=(10,5))
+plt.title("New Deaths among 80 and older")
+plt.plot(q["Date"],q["Deaths"])
+```
+\
+We separate out every age category and recombine into five new composite categories to represent the five age groups we have in our model. These new death counts are plotted below:\
 
 ```{python}
-
 #DEATHS 
 binsNum = 14
 
@@ -665,44 +707,74 @@ Deaths50_69  = pd.DataFrame(dict)
 dict = {"Date": df7["Date"], "Deaths":  (df7["Deaths"] + df8["Deaths"])[:-2].fillna(0)}
 Deaths70_89  = pd.DataFrame(dict)
 
+plt.figure(figsize=(10,5))
 plt.plot(Deaths0_9["Date"], Deaths0_9["Deaths"], label = "Under 10")
 plt.plot(Deaths10_29["Date"], Deaths10_29["Deaths"], label = "10-29")
 plt.plot(Deaths30_49["Date"], Deaths30_49["Deaths"], label = "30-49")
 plt.plot(Deaths50_69["Date"], Deaths50_69["Deaths"], label = "50-69")
 plt.plot(Deaths70_89["Date"], Deaths70_89["Deaths"], label = "70+")
 plt.legend()
-plt.title("DEATH Count by Age Group (rolling average)")
+plt.title("new DEATH Count by Age Group (rolling average)")
 
 
-Deaths0_9.tail()
-Deaths70_89.tail()
+#Deaths0_9.tail()
+#Deaths70_89.tail()
 plt.show()
 ```
 
 
+\
 
-
-
+Total length of time series:\
 ```{r}
 ##Testing
 library(reticulate)
-
 length(py$Deaths70_89$Deaths)
-
 ```
 
+
+\
+
+Before fitting, we check to see if our model has similar structure among the elderly:
+\
 ```{r}
-plot(diff(run_sim()$D5))
+#What do the deaths look like for old people in our model before fitting?
+#Has awareness and age structure both on.
+
+par = make_params()
+par["k"] = 2
+par["delta_c"] = 1/(theN**2)
+
+plot(diff(run_sim(c(par, make_beta()),use_awareness = TRUE, length= 100)$D5))
+#large part of this is vital dynamics maybe? Turning those off.
+par["natural_death_rate"] = 0
+#Doesn't change anything.
+#cumulative
+plot(run_sim(c(par, make_beta()),use_awareness = TRUE)$D5)
 ```
 
+\
+Our data levels off sooner and sharper going into the summer. This seems fixable with fitted parameters. There is one place our model does not fit: if you look back at new cases, the largest spike by far is in the second wave; this goes against our implicit assumption of dampend oscillation. \
+
+A proposed modification could be to have some sort of marginal death rate, such that as more people die, the rate $\delta$ of deaths falls, indicating that those who survive the first wave have increased ability to survive the following waves, or that as the pandemic spreads, technology and care increases such that survival becomes a more likely case outcome. This plays well with our awareness term; as deaths per infection falls, the rate of infections would increase, leading to increasing oscillation before they eventually die out. This matches the data, and seems like a reasonable modification, so we'll look into if this is a reasonable addition next, although it might not make it to the final project.\
+
+
+\
+Next we try fitting to data. After many hours, this didn't end up working like we'd hoped. Our initial model fitter for simple models in python works great now after failing the first milestone, and we are confident we'll have better results here for the final project.\
+
+\
+Tests of error functions are below. 
+\
 
 ```{r}
 ###Make  error function
-library(MLmetrics)
+library(MLmetrics) #Gives nice MLE
 
 errorDeaths =  function(parameters){
   
-  sim_results = run_sim(params = parameters, length = (length(py$Deaths10_29$Deaths) - 1 ))
+  #run a simulation for input parameters with output the same length as the dataset
+  #subtract one because run_sim is too long by one by default. All dfs same length.
+  sim_results = run_sim(params = parameters, length = (length(py$Deaths10_29$Deaths) - 1 ),use_awareness = TRUE)
   
   s1 = (sim_results$D1 )
   s2 = (sim_results$D2 )
@@ -711,17 +783,21 @@ errorDeaths =  function(parameters){
   s5 = (sim_results$D5 )
 
   
-  return(  MSE(s1, py$Deaths0_9$Deaths) + 
+  return(sqrt( MSE(s1, py$Deaths0_9$Deaths) + 
            MSE(s2, py$Deaths10_29$Deaths) +
            MSE(s3, py$Deaths30_49$Deaths) +
            MSE(s4, py$Deaths50_69$Deaths) +
-           MSE(s5, py$Deaths70_89$Deaths) )
+           MSE(s5, py$Deaths70_89$Deaths)) )
 }
 
 
 errorCases = function(parameters){
-  
-  sim_results = run_sim(params = parameters, length = (length(py$df10_29$Cases) -1))
+  #Back when I was trying to fit to cases I was using this, but
+  #fitting to cases is real tough --- I couldn't get a parameter (or combination of parameters) that
+  #seemed reasonable to fit diff(Total cases) to. Definitely possible and probably not hard,
+  #but vital dynamics making negative diff() in complement of susceptable or similar + people dropping
+  #out of infected, cumsum($In) not looking great, and few other things lead me to try with deaths      #instead.
+  sim_results = run_sim(params = parameters, length = (length(py$df10_29$Cases) -1),use_awareness = TRUE)
   
   s1 = (sim_results$I1 + sim_results$Q1 )
   s2 = (sim_results$I2 + sim_results$Q2 )
@@ -736,70 +812,138 @@ errorCases = function(parameters){
            MSE(s5, py$df70_89$Cases) )
 }
 
+
+###Test these out
+
+#Make parameter list
 Para1 = make_params()
+
+#Change value for beta
 Para1['Beta'] = 0.42
+
+#Change value for gamma
 Para1['gamma'] = 0.0082
 
+#Print list with new values as check
+#print(Para1)
 
-print(Para1)
-
+#Calculate error functions at these new values
 errorCases(Para1)
 errorDeaths(Para1)
 
+#Run a simulation with these parameters to check for wierd infinities like optim claims
 sim_results = run_sim(params = Para1, length = (length(py$df10_29$Cases) -1))
 
-run_sim(params = Para1)
-print(sim_results)
+#Just use default length --- maybe the issue is with length
+#run_sim(params = Para1)
+#nope
+
+#check results --- these never change for me. big issue.
+#print(sim_results)
+
+#check that the issue isn't with the way I was summing.
 #print((sim_results$I1 + sim_results$Q1 + py$df10_29$Cases))
 ```
 
 
+
+\
+Our fitted parameters are below. Note that they are just the initial parameters, as our method did not converge:
+\
 ```{r}
 ##Using Optim, fit the model
 library(stats)
 
+#make new param list with default params
 initparams = make_params()
 
-initparams['Beta'] = 0.4
+#change any value to make sure this works; optim should change anyways.
+initparams['gamma'] = 0.2
 
-errorDeaths(initparams)
-results = optim(par = initparams, fn = errorDeaths, method = "L-BFGS-B", control = list(maxit = 1))
+#test that I don't get an infinite value error with these params without optim
+errorDeaths(c(make_params(), make_beta()))
 
+#run optim
+results = optim(par =  c(make_params(), make_beta() ),fn = errorDeaths, method = "Nelder-Mead", control = list(maxit = 20))
+#, upper = c(1,1,1,1,50/40000000,1,1,8,50,50,50,50,50,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1))
+
+#look at results
 results
 ```
 
+\
+Check to see what parameters changed:
 ```{r}
-results$par == make_params()
+#Check to see what parameters it changed
+results$par == c(make_params(),make_beta())
 
-para = results$par
+#Look at parameters
+#para = results$par
+#results
+```
+\
+Nothing changed, as expected.
+\
+
+
+```{r}
+#Run simulation with new parameters
+par['k'] = 2
+sim_results = run_sim(params = par,  use_awareness = TRUE,length = (length(py$df10_29$Cases)))
+
+#para == par
 ```
 
-```{r}
-
-sim_results = run_sim(params = para, length = (length(py$df10_29$Cases) ))
-TotalCases = diff(sim_results$I2 + sim_results$Q2 + sim_results$R2 +sim_results$D2)
-TotalInfected2 = sim_results$I2
-
-
-s1 = diff(cumsum(sim_results$I1))
+```{python}
+#Just a bunch of quick plots to look at results
 #plot(NewCases2)
-plot(sim_results$I4)
-#plot(sim_results$R1)
-#plot(py$df10_29$Cases)
+res = r.sim_results 
 
-#plot(cumsum(-NewCases2))
-#plot(cumsum(py$df10_29$Cases))
+
+plt.plot(np.diff(res["D1"]), label = "Deaths in age group 0-9")
+plt.plot(np.diff(res["D2"]), label = "Deaths in age group 10-29")
+plt.plot(np.diff(res["D3"]), label = "Deaths in age group 30-49")
+plt.plot(np.diff(res["D4"]), label = "Deaths in age group 50-69")
+plt.plot(np.diff(res["D5"]), label = "Deaths in age group 70-89")
+plt.title("Deaths by age group: Model Output")
+plt.legend()
+plt.show()
+```
+
+\
+
+Now checking susceptables to see if persistant deaths are due to vital dynamics or disease dynamics
+\
+```{python}
+plt.title("Remaining Susceptables in 70-89: Model Output")
+plt.plot((res["S5"]))
+```
+\
+This suggests deaths are due to disease dynamics, not natural death rate --- should look at changing $\delta$, but no bugs here. 
+\
+
+```{python}
+plt.title("Model v Fitted --- Second to Oldest Age Group")
+plt.plot(Deaths50_69["Deaths"], marker = 'o', linestyle = 'none')
+plt.plot(np.diff(res["D4"]))
 #plot(sim_results$I1)
 ```
 
+\
+So, to conclude this section on parameter estimation, we have major issues with optimizers still. But our last optimizer works, and this one will too!
+\
+\
+Our next steps include fixing these numerical issues, looking at different data smoothing methods, looking at adding marginal decreasing mortality, and fleshing out the mathematical analysis around R0 as outlined in our initial proposal.
+\
 
-
+Thank you!
+\
 
 
 ```{r}
-run_sim(params = initparams)
-run_sim(make_params())
+#testing?
+#run_sim(params = initparams)
+#run_sim(make_params())
 ```
-
 
 
