@@ -90,9 +90,9 @@ Age structured extension:
 \end{align*}
 \end{center}
 
-As the awarness driven behavior reduces to zero on the boundary of the simplex, specifically at $S = 0$ or $I = 0$, our extensions to the origianl model in Nuraine has no effect on the biological well posedness of the model. We can use an identical argument as for the non age structured model with vaccination.
+As the awarness driven behavior reduces to zero on the boundary of the simplex, specifically at $S = 0$ or $I = 0$, our extensions to the origianl model in Nuraini has no effect on the biological well posedness of the model. We can use an identical argument as for the non age structured model with vaccination.
 
-The argument that the sum of all the states for each age class (i.e $S_1 + I_2 + Q_2 + R_2 + D_2$) never goes above 1 is the same as above, in that the sum of the states is non increasing.
+The argument that the sum of all the states for each age class (i.e $S_1 + I_1 + Q_1 + R_1 + D_1$) never goes above 1 is the same as above, in that the sum of the states is non increasing.
 
 \newpage
 
