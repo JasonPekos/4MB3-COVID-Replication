@@ -72,9 +72,11 @@ We next present age structured model with vaccination below:
 \end{align*}
 \end{center}
 
+As each transmission rate, $\beta_{ij}$ is positive, this model is well posed too, using an identical argument as above for each age class. The argument that the sum of all the states for each age class (i.e $S_1 + I_2 + Q_2 + R_2 + D_2$) never goes above 1 is the same as above, in that the sum is non increasing.
+
 \newpage
 
-We chose to extend the paper to account for awareness-driven behaviour, as done in Wetiz, Dushoff, and the mans (cite)
+We chose to extend the paper to account for awareness-driven behaviour, as done in Weitz and Dushoff et. al.
 
 Age structured extension:
 
@@ -87,6 +89,10 @@ Age structured extension:
 \frac{d(D_{i}(t))}{dt} &=  \delta(Q_{i}(t)\\
 \end{align*}
 \end{center}
+
+As the awarness driven behavior reduces to zero on the boundary of the simplex, specifically at $S = 0$ or $I = 0$, our extensions to the origianl model in Nuraine has no effect on the biological well posedness of the model. We can use an identical argument as for the non age structured model with vaccination.
+
+The argument that the sum of all the states for each age class (i.e $S_1 + I_2 + Q_2 + R_2 + D_2$) never goes above 1 is the same as above, in that the sum of the states is non increasing.
 
 \newpage
 
