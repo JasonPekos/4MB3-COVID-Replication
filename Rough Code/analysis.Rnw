@@ -1,0 +1,93 @@
+\documentclass[12pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\graphicspath{ {./images/} }
+\usepackage{listings}
+\usepackage{lineno}\renewcommand\thelinenumber{\color{gray}\arabic{linenumber}}
+\usepackage{amssymb}
+
+\newcommand{\R}{{\mathcal R}}
+\newcommand{\F}{{\mathcal F}}
+\newcommand{\V}{{\mathcal V}}
+
+\usepackage{lineno}\renewcommand\thelinenumber{\color{gray}\arabic{linenumber}}
+
+\usepackage[nameinlink,capitalize]{cleveref}
+\crefname{equation}{Equation}{Equations}
+\Crefname{equation}{Equation}{Equations}
+\crefname{figure}{Figure}{Figures}
+\Crefname{figure}{Figure}{Figures}
+
+\begin{document}
+
+\linenumbers
+
+\title{4MB3 Final Project: Analytical Stuff}
+\author{Zachary Levine}
+\date{\today}
+\maketitle
+\newpage
+
+\section*{Biological-posedness}
+
+We present the non age structured model with vaccination below:
+
+\begin{center}
+\begin{align*}
+\frac{d(S(t))}{dt} &= \pi \hat{N}(t)+\zeta R(t)-\left(\beta \frac{I(t)}{N}+\eta v(t)+\mu\right) S(t) \\
+\frac{d(I(t))}{dt} &= \frac{\beta S(t) I(t)}{N}-(q+\mu) I(t) \\
+\frac{d Q(t)}{d t} &= q I(t)-(\gamma+\delta+\mu) Q(t) \\
+\frac{d R(t)}{d t} &= \gamma Q(t)+\eta v(t) S(t)-(\zeta+\mu) R(t) \\
+\frac{d(D(t))}{dt} &=   \delta(Q(t))\\
+\hat{N}(t) &= N - D(t)\\
+N(t) &= S(t) + I(t) + Q(t) + R(t) + D(t)
+\end{align*}
+\end{center}
+
+
+We claim that the model is biologically well-posedness. We start by definiing the biological simplex as the bioligically meaningful region in phase space, where all the states are nonzero, and the sum of the states is less than or equal to N or 1. We claim that if the initial state of the system is within the bioloigcal simplex, then the trajectories stay within the simplex for all time. For this, it is sufficient to prove that on the boundary of simplex, the vector field does not point outside of the simplex.
+
+We claim that the infective category $I(t)$ is always nonnegative. To see this, we note that at $I = 0$, $\frac{dI}{dt}  = 0$, so that the infective category can never cross zero. Next, at $Q(t) = 0$, $\frac{dQ}{dt} =  q I(t)$, which is also non negative, as $I(t)$ is always nonnegative, and $q > 0$. $\delta > 0$, so $\frac{dD}{dt}$ is also always nonnegative. Thus, if we start with positive initial conditions, the number of deaths will never decrease, so we certainly won't cross zero and take on negative values. At $S(t) = 0$, $\frac{dS}{dt} = \pi \hat{N}(t)+\zeta R(t) = \pi (N - D(t)) +\zeta R(t) = \pi (0 + I(t) + Q(t) + R(t) + D(t) - D(t)) +\zeta R(t)$. Since $I(t)$ and  $Q(t)$ are both nonnegative, $\frac{dS(S = 0)}{dt} = (\pi + \zeta) R(t)$. As both $\pi$ and $\zeta$ are $>0$, this vector will only point outside of the biological simplex if $R(t) < 0$.
+
+However, if (S = 0), $R(t)$ can't cross zero because $\frac{dR}{dt}(S = 0, R  = 0) = \gamma Q(t)$, and $Q(t)$ is always nonnegative. So the susceptble compartment can't cross zero. Similarly then, $\frac{dR}{dt}(R = 0) = \gamma Q(t)+\eta v(t) S(t)$, which will always be nonegative, as $S(t)$ and $Q(t)$ are nonnegative.
+
+Thus, given positive initial conditions, all states stay nonnegative. We next claim that the sum of the states at any point never goes above $N$, or 1. To see, this, we note that the rate of change of $S + I + Q + R + D$ is $\frac{dS}{dt} + \frac{dI}{dt} + \frac{dQ}{dt} + \frac{dR}{dt} + \frac{dD}{dt} = \pi \hat{N} - \mu(S + I + Q + R) = \pi (S + I + Q + R) - \mu(S + I + Q + R)$. If births balance deaths, which is a useful approximation over short time scales, then $\pi = \mu$, and this sum reduces to zero. In particular, the sum of the states is non increasing. This gives $\frac{dS}{dt} + \frac{dI}{dt} + \frac{dQ}{dt} + \frac{dR}{dt} + \frac{dD}{dt} \leq S(t = 0) + I(t = 0) + Q(t = 0) + R(t = 0) + D(t = 0) $. This completes the proof that, if we start with initial conditions inside the biological simplex, we stay in that simplex for all time.
+
+\newpage
+
+We next present age structured model with vaccination below:
+
+\begin{center}
+\begin{align*}
+\frac{d(S_{i}(t))}{dt} &=  \pi(\hat{N}_{i}(t)) + \zeta(R_{i}(t) - (\sum_{j}(\beta_{ij}\frac{I_{j}(t)}{N})) + \eta(v_{i}(t)) + \mu)S_{i}(t)\\
+\frac{d(I_{i}(t))}{dt} &=  \sum_{j} (\beta_{ij}\frac{I_{j}}{N}) - (q+\mu)I_{i}(t)\\
+\frac{dQ_{i}(t)}{dt} &=  q(I_{i}(t))-(\gamma + \delta + \mu)(Q_{i}(t))\\
+\frac{d(R_{i}(t))}{dt} &=  \gamma(Q_{i}(t)) + \eta(v_{i}(t))(S_{i}(t)) - (\zeta + \mu)(R_{i}(t))\\
+\frac{d(D_{i}(t))}{dt} &=  \delta(Q_{i}(t))\\
+\end{align*}
+\end{center}
+
+\newpage
+
+We chose to extend the paper to account for awareness-driven behaviour, as done in Wetiz, Dushoff, and the mans (cite)
+
+Age structured extension:
+
+\begin{center}
+\begin{align*}
+\frac{dS_i(t)}{dt} &=  \mu(N_i(t) - D_i(t)) + \zeta R_i(t) - \sum_j \left(\frac{\beta_{ij} S_j(t) I_j(t)}{ N \left[1+\left(dD_i(t) / \delta_{c}\right)^{k}\right]}\right) + (\nu v + \mu)S_i(t)\\
+\frac{d(I_{i}(t))}{dt} &=  \sum_{j} \left(\frac{\beta_{ij} S_j(t) I_j(t)}{ N \left[1+\left(dD_i(t) / \delta_{c}\right)^{k}\right]}\right) - (q+\mu)I_{i}(t)\\
+\frac{dQ_{i}(t)}{dt} &=  q(I_{i}(t))-(\gamma + \delta + \mu)(Q_{i}(t))\\
+\frac{d(R_{i}(t))}{dt} &=  \gamma(Q_{i}(t)) + \eta(v_{i}(t))(S_{i}(t)) - (\zeta + \mu)(R_{i}(t))\\
+\frac{d(D_{i}(t))}{dt} &=  \delta(Q_{i}(t)\\
+\end{align*}
+\end{center}
+
+\newpage
+
+\end{document}
